@@ -240,6 +240,7 @@ void ofAppGLFWWindow::setup(const ofGLFWWindowSettings & _settings){
 	}
 
 #ifndef TARGET_OPENGLES
+#ifndef OF_USING_EQ
     static bool inited = false;
     if(!inited){
 		glewExperimental = GL_TRUE;
@@ -252,6 +253,7 @@ void ofAppGLFWWindow::setup(const ofGLFWWindowSettings & _settings){
 		}
 		inited = true;
     }
+#endif
 #endif
 
     ofLogVerbose() << "GL Version:" << glGetString(GL_VERSION);
