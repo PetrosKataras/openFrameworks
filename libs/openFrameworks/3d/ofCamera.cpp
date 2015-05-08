@@ -10,7 +10,8 @@ farClip(0),
 lensOffset(0.0f, 0.0f),
 forceAspectRatio(false),
 aspectRatio(4./3.),
-vFlip(false)
+vFlip(false),
+customProjectionSet(false)
 {
 }
 
@@ -30,6 +31,12 @@ void ofCamera::setNearClip(float f) {
 //----------------------------------------
 void ofCamera::setFarClip(float f) {
 	farClip = f;
+}
+
+void ofCamera::setProjectionMatrix( const ofMatrix4x4& projectionMatrix )
+{
+    customProjectionMatrix = projectionMatrix;
+    customProjectionSet = true;
 }
 
 //----------------------------------------
@@ -140,6 +147,10 @@ void ofCamera::end() {
 //----------------------------------------
 ofMatrix4x4 ofCamera::getProjectionMatrix(ofRectangle viewport) const {
 	viewport = getViewport(viewport);
+
+    if( customProjectionSet ){
+        return customProjectionMatrix;
+    }
 	// autocalculate near/far clip planes if not set by user
 	const_cast<ofCamera*>(this)->calcClipPlanes(viewport);
 

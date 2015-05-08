@@ -39,6 +39,14 @@ public:
 
     void setFarClip(float f);
 	
+	/// \brief Set a custom projection matrix for this camera.
+	///
+	/// This is useful if the projection matrix is being calculated externally 
+    /// and you still want to use the functionality of ofCamera.
+	///
+	/// \param projectionMatrix The custom projection matrix to be used with this camera.
+    void setProjectionMatrix( const ofMatrix4x4& projectionMatrix );
+
 	/// \brief Set the "lens offset" applied to this camera.
 	/// 
 	/// Ordinarily, the camera is pointed straight down the center of its view
@@ -225,5 +233,7 @@ private:
 	float aspectRatio; // only used when forceAspect=true, = w / h
 	bool vFlip;
 	shared_ptr<ofBaseRenderer> renderer;
+    ofMatrix4x4 customProjectionMatrix;
+    bool customProjectionSet;
 };
 
