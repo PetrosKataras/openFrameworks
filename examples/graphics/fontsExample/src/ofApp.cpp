@@ -134,7 +134,7 @@ void ofApp::keyPressed(int key){
 			typeStr.clear();
 			bFirst = false;
 		}
-		typeStr.append(1, (char)key);
+		ofAppendUTF8(typeStr,key);
 	}
 }
 
@@ -160,6 +160,16 @@ void ofApp::mousePressed(int x, int y, int button){
 
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button){
+
+}
+
+//--------------------------------------------------------------
+void ofApp::mouseEntered(int x, int y){
+
+}
+
+//--------------------------------------------------------------
+void ofApp::mouseExited(int x, int y){
 
 }
 

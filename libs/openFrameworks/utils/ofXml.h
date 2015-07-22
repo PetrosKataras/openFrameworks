@@ -49,6 +49,8 @@ public:
     string          getValue(const string & path) const;
     int				getIntValue() const;
     int				getIntValue(const string & path) const;
+    int64_t getInt64Value() const;
+    int64_t getInt64Value(const string& path) const;
     float			getFloatValue() const;
     float			getFloatValue(const string & path) const;
     bool			getBoolValue() const;
@@ -207,7 +209,7 @@ public:
     {
     	if(element){
 			if(path == ""){
-				if(element->firstChild()->nodeType() == Poco::XML::Node::TEXT_NODE) {
+				if(element->firstChild() && element->firstChild()->nodeType() == Poco::XML::Node::TEXT_NODE) {
 					return ofFromString<T>(element->innerText());
 				} else {
 					ofLogWarning("ofXml") << "getValue(): path \"" << path<< "\" not found when getting value";

@@ -77,9 +77,8 @@ void ofApp::draw() {
     // this is the total time of the animation based on fps
     //float totalTime = images.size() / sequenceFPS;
     
-    
-    int frameIndex = 0;
-    
+    uint64_t frameIndex = 0;
+
     if(bFrameIndependent) {
         // calculate the frame index based on the app time
         // and the desired sequence fps. then mod to wrap
@@ -161,6 +160,16 @@ void ofApp::mousePressed(int x, int y, int button){
 //--------------------------------------------------------------
 void ofApp::mouseReleased(int x, int y, int button){
     
+}
+
+//--------------------------------------------------------------
+void ofApp::mouseEntered(int x, int y){
+
+}
+
+//--------------------------------------------------------------
+void ofApp::mouseExited(int x, int y){
+
 }
 
 //--------------------------------------------------------------

@@ -15,12 +15,12 @@ ofNode::ofNode()
 //----------------------------------------
 void ofNode::setParent(ofNode& parent, bool bMaintainGlobalTransform) {
     if(bMaintainGlobalTransform) {
-        ofMatrix4x4 globalTransform(getGlobalTransformMatrix());
-        this->parent = &parent;
-        setTransformMatrix(globalTransform);
-    } else {
-        this->parent = &parent;
-    }
+		ofMatrix4x4 postParentGlobalTransform = getGlobalTransformMatrix() * parent.getGlobalTransformMatrix().getInverse();
+		this->parent = &parent;
+		setTransformMatrix(postParentGlobalTransform);
+	} else {
+		this->parent = &parent;
+	}
 }
 
 //----------------------------------------
@@ -377,12 +377,18 @@ void ofNode::customDraw(){
 
 //----------------------------------------
 void ofNode::transformGL(ofBaseRenderer * renderer) const {
+	if( renderer == NULL ) {
+		renderer = ofGetCurrentRenderer().get();
+	}
 	renderer->pushMatrix();
 	renderer->multMatrix( getGlobalTransformMatrix() );
 }
 
 //----------------------------------------
 void ofNode::restoreTransformGL(ofBaseRenderer * renderer) const {
+	if( renderer == NULL ) {
+		renderer = ofGetCurrentRenderer().get();
+	}
 	renderer->popMatrix();
 }
 

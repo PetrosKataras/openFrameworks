@@ -159,10 +159,10 @@ public:
 	ofTextureData() {
 		textureID = 0;
 #ifndef TARGET_OPENGLES
-		glTypeInternal = GL_RGB8;
+		glInternalFormat = GL_RGB8;
 		textureTarget = GL_TEXTURE_RECTANGLE_ARB;
 #else
-		glTypeInternal = GL_RGB;
+		glInternalFormat = GL_RGB;
 		textureTarget = GL_TEXTURE_2D;
 #endif
 
@@ -191,7 +191,7 @@ public:
 	unsigned int textureID; ///< GL internal texture ID.
 	int textureTarget; ///< GL texture type, either GL_TEXTURE_2D or
 	                   ///< GL_TEXTURE_RECTANGLE_ARB.
-	int glTypeInternal; ///< GL internal format, e.g. GL_RGB8.
+	int glInternalFormat; ///< GL internal format, e.g. GL_RGB8.
                         ///< \sa http://www.opengl.org/wiki/Image_Format
 	
 	float tex_t; ///< Texture horizontal coordinate, ratio of width to display width.
@@ -383,7 +383,25 @@ class ofTexture : public ofBaseDraws {
 	/// \param pix Reference to ofFloatPixels instance.
 	/// \param bUseARBExtension Set to true to use rectangular textures.
 	virtual void allocate(const ofFloatPixels& pix, bool bUseARBExtension);
-	
+
+#ifndef TARGET_OPENGLES
+	/// \brief Allocate texture as a Buffer Texture.
+	///
+	/// Uses a GPU buffer as data for the texture instead of pixels in RAM
+	/// Allows to use texture buffer objects (TBO) which make it easier to send big
+	/// amounts of data to a shader as a uniform.
+	/// 
+	/// Buffer textures are 1D textures, and may only be sampled using texelFetch 
+	/// in GLSL.
+	///
+	/// See textureBufferInstanceExample and https://www.opengl.org/wiki/Buffer_Texture
+	///
+	/// \sa allocate(const ofBufferObject & buffer, int glInternalFormat)
+	/// \param buffer Reference to ofBufferObject instance.
+	/// \param glInternalFormat Internal pixel format of the data.
+	void allocateAsBufferTexture(const ofBufferObject & buffer, int glInternalFormat);
+#endif
+
 
 	/// \brief Determine whether the texture has been allocated.
 	///
@@ -513,6 +531,14 @@ class ofTexture : public ofBaseDraws {
 
 #ifndef TARGET_OPENGLES
 	/// \brief Load pixels from an ofBufferObject
+	///
+	/// This is different to allocate(ofBufferObject,internal). That
+	/// creates a texture which data lives in GL buffer while this
+	/// copies the data from the buffer to the texture.
+	///
+	/// This is usually used to upload data to be shown asynchronously
+	/// by using a buffer object binded as a PBO
+	///
 	/// \param buffer The buffer to load.
 	/// \param glFormat GL pixel type: GL_RGBA, GL_LUMINANCE, etc.
 	/// \param glType the GL type to load.
@@ -655,7 +681,7 @@ class ofTexture : public ofBaseDraws {
 	///
 	void unbind(int textureLocation=0) const;
 
-#ifndef TARGET_OPENGLES
+#if !defined(TARGET_OPENGLES) && defined(glBindImageTexture)
 	/// Calls glBindImageTexture on the texture
 	///
 	/// Binds the texture as an read or write image, only available since OpenGL 4.2

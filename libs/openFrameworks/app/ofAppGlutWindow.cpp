@@ -474,7 +474,7 @@ void ofAppGlutWindow::setWindowShape(int w, int h){
 //------------------------------------------------------------
 void ofAppGlutWindow::hideCursor(){
 	#if defined(TARGET_OSX) && defined(MAC_OS_X_VERSION_10_7)
-		 CGDisplayHideCursor(NULL);
+		 CGDisplayHideCursor(0);
 	#else
 		glutSetCursor(GLUT_CURSOR_NONE);
 	#endif
@@ -483,7 +483,7 @@ void ofAppGlutWindow::hideCursor(){
 //------------------------------------------------------------
 void ofAppGlutWindow::showCursor(){
 	#if defined(TARGET_OSX) && defined(MAC_OS_X_VERSION_10_7)
-		 CGDisplayShowCursor(NULL);
+		 CGDisplayShowCursor(0);
 	#else
 		glutSetCursor(GLUT_CURSOR_LEFT_ARROW);
 	#endif
@@ -817,7 +817,11 @@ void ofAppGlutWindow::resize_cb(int w, int h) {
 
 //------------------------------------------------------------
 void ofAppGlutWindow::entry_cb(int state) {
-	instance->events().notifyWindowEntry( state );
+	if (state == GLUT_ENTERED){
+		instance->events().notifyMouseEntered(instance->events().getMouseX(), instance->events().getMouseY());
+	}else if (state == GLUT_LEFT){
+		instance->events().notifyMouseExited(instance->events().getMouseX(), instance->events().getMouseY());
+	}
 }
 
 //------------------------------------------------------------

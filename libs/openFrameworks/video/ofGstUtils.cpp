@@ -21,6 +21,10 @@
 #include <gst/gl/x11/gstgldisplay_x11.h>
 #include <gst/gl/egl/gstgldisplay_egl.h>
 #endif
+#ifdef TARGET_WIN32
+#include <winbase.h>	// to use SetEnvironmentVariableA
+#endif
+
 
 ofGstUtils::ofGstMainLoopThread * ofGstUtils::mainLoop;
 
@@ -118,7 +122,9 @@ ofGstUtils::ofGstUtils() {
 	if(!gst_inited){
 #ifdef TARGET_WIN32
 		string gst_path = g_getenv("GSTREAMER_1_0_ROOT_X86");
-		putenv(("GST_PLUGIN_PATH_1_0=" + ofFilePath::join(gst_path, "lib\\gstreamer-1.0") + ";.").c_str());
+		//putenv(("GST_PLUGIN_PATH_1_0=" + ofFilePath::join(gst_path, "lib\\gstreamer-1.0") + ";.").c_str());
+		// to make it compatible with gcc and C++11 standard
+		SetEnvironmentVariableA("GST_PLUGIN_PATH_1_0", ofFilePath::join(gst_path, "lib\\gstreamer-1.0").c_str());
 #endif
 		gst_init (NULL, NULL);
 		gst_inited=true;
@@ -163,9 +169,8 @@ void ofGstUtils::eos_cb(){
 	bIsMovieDone = true;
 	if(appsink && !isAppSink) appsink->on_eos();
 	if(closing){
-		eosMutex.lock();
-		eosCondition.signal();
-		eosMutex.unlock();
+		std::unique_lock<std::mutex> lck(eosMutex);
+		eosCondition.notify_all();
 	}
 }
 
@@ -494,15 +499,12 @@ void ofGstUtils::setSpeed(float _speed){
 void ofGstUtils::close(){
 	if(bPlaying){
 		if(!bIsMovieDone && !bPaused && !isStream){
-			eosMutex.lock();
+			std::unique_lock<std::mutex> lck(eosMutex);
 			closing = true;
 			gst_element_send_event(gstPipeline,gst_event_new_eos());
-			try{
-				eosCondition.wait(eosMutex,5000);
-			}catch(const Poco::TimeoutException & e){
+			if(eosCondition.wait_for(lck,std::chrono::milliseconds(5000))==std::cv_status::timeout){
 				ofLogWarning("ofGstUtils") << "didn't received EOS in 5s, closing pipeline anyway";
 			}
-			eosMutex.unlock();
 			closing = false;
 		}
 	}
@@ -785,7 +787,7 @@ ofGstVideoUtils::~ofGstVideoUtils(){
 
 void ofGstVideoUtils::close(){
 	ofGstUtils::close();
-	ofScopedLock lock(mutex);
+	std::unique_lock<std::mutex> lock(mutex);
 	pixels.clear();
 	backPixels.clear();
 	eventPixels.clear();
@@ -828,7 +830,7 @@ ofTexture * ofGstVideoUtils::getTexture(){
 void ofGstVideoUtils::update(){
 	if (isLoaded()){
 		if(!isFrameByFrame()){
-			ofScopedLock lock(mutex);
+			std::unique_lock<std::mutex> lock(mutex);
 			bHavePixelsChanged = bBackPixelsChanged;
 			if (bHavePixelsChanged){
 				bBackPixelsChanged=false;
@@ -1159,7 +1161,7 @@ ofPixelFormat ofGstVideoUtils::getPixelFormat() const{
 }
 
 bool ofGstVideoUtils::allocate(int w, int h, ofPixelFormat pixelFormat){
-	Poco::ScopedLock<ofMutex> lock(mutex);
+	std::unique_lock<std::mutex> lock(mutex);
 #if GST_VERSION_MAJOR>0
 	if(pixelFormat!=internalPixelFormat){
 		ofLogNotice("ofGstVideoUtils") << "allocating with " << w << "x" << h << " " << getGstFormatName(pixelFormat);
@@ -1178,7 +1180,7 @@ bool ofGstVideoUtils::allocate(int w, int h, ofPixelFormat pixelFormat){
 }
 
 void ofGstVideoUtils::reallocateOnNextFrame(){
-	Poco::ScopedLock<ofMutex> lock(mutex);
+	std::unique_lock<std::mutex> lock(mutex);
 	pixels.clear();
 	backPixels.clear();
 	bIsFrameNew					= false;
@@ -1247,7 +1249,7 @@ GstFlowReturn ofGstVideoUtils::process_sample(shared_ptr<GstSample> sample){
 			bufferQueue.push(sample);
 			gst_buffer_unmap(_buffer, &mapinfo);
 			bool newTexture=false;
-			ofScopedLock lock(mutex);
+			std::unique_lock<std::mutex> lock(mutex);
 			while(bufferQueue.size()>2){
 				backBuffer = bufferQueue.front();
 				bufferQueue.pop();
