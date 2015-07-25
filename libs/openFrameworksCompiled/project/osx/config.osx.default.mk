@@ -16,6 +16,7 @@
 #
 ##########################################################################################
 
+USE_EQ=TRUE
 ##########################################################################################
 # PLATFORM SPECIFIC CHECKS
 #   This is a platform defined section to create internal flags to enable or disable
@@ -44,6 +45,10 @@ PLATFORM_RUN_COMMAND = cd bin/$(BIN_NAME).app/Contents/MacOS/;./$(BIN_NAME)
 ##########################################################################################
 
 PLATFORM_DEFINES = __MACOSX_CORE__
+
+ifeq (${USE_EQ},TRUE)
+    PLATFORM_DEFINES += OF_USING_EQ
+endif
 
 ##########################################################################################
 # PLATFORM REQUIRED ADDON
