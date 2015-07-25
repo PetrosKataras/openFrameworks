@@ -140,7 +140,6 @@ void ofCamera::end() {
 //----------------------------------------
 ofMatrix4x4 ofCamera::getProjectionMatrix(ofRectangle viewport) const {
 	viewport = getViewport(viewport);
-
 	// autocalculate near/far clip planes if not set by user
 	const_cast<ofCamera*>(this)->calcClipPlanes(viewport);
 
