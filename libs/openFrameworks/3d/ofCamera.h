@@ -225,5 +225,6 @@ private:
 	float aspectRatio; // only used when forceAspect=true, = w / h
 	bool vFlip;
 	shared_ptr<ofBaseRenderer> renderer;
+    ofMatrix4x4 customProjectionMatrix;
 };
 
