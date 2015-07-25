@@ -18,6 +18,7 @@ ofBufferObject::Data::Data()
 	//      when we pin data to it using setData()
 	// 
 	//      see also: https://www.opengl.org/registry/specs/ARB/direct_state_access.txt
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if (ofGLCheckExtension("GL_ARB_direct_state_access")) {
 		useDSA = true;
@@ -27,6 +28,7 @@ ofBufferObject::Data::Data()
 		glCreateBuffers(1,&id);
 		return;
 	}
+#endif
 #endif
 
 	glGenBuffers(1,&id);
@@ -103,11 +105,13 @@ void ofBufferObject::setData(GLsizeiptr bytes, const void * data, GLenum usage){
 	if(!this->data) return;
 	this->data->size = bytes;
 
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if (this->data->useDSA) {
 		glNamedBufferData(this->data->id, bytes, data, usage);
 		return;
 	}
+#endif
 #endif
 
 	/// --------| invariant: direct state access is not available
@@ -119,11 +123,13 @@ void ofBufferObject::setData(GLsizeiptr bytes, const void * data, GLenum usage){
 void ofBufferObject::updateData(GLintptr offset, GLsizeiptr bytes, const void * data){
 	if(!this->data) return;
 
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if(this->data->useDSA){
 		glNamedBufferSubData(this->data->id,offset,bytes,data);
 		return;
 	}
+#endif
 #endif
 
 	/// --------| invariant: direct state access is not available
@@ -137,10 +143,12 @@ void ofBufferObject::updateData(GLintptr offset, GLsizeiptr bytes, const void * 
 void * ofBufferObject::map(GLenum access){
 	if(!this->data) return nullptr;
 
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if (data->useDSA) {
 		return glMapNamedBuffer(data->id,access);
 	}
+#endif
 #endif
 
 	/// --------| invariant: direct state access is not available
@@ -156,11 +164,13 @@ void * ofBufferObject::map(GLenum access){
 void ofBufferObject::unmap(){
 	if(!this->data) return;
 
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if (data->useDSA) {
 		glUnmapNamedBuffer(data->id);
 		return;
 	}
+#endif
 #endif
 
 	/// --------| invariant: direct state access is not available
@@ -172,10 +182,12 @@ void ofBufferObject::unmap(){
 void * ofBufferObject::mapRange(GLintptr offset, GLsizeiptr length, GLenum access){
 	if(!this->data) return nullptr;
 
+#ifndef OF_USING_EQ
 #ifdef GLEW_ARB_direct_state_access
 	if (data->useDSA) {
 		return glMapBufferRange(data->id,offset,length,access);
 	}
+#endif
 #endif
 
 	/// --------| invariant: direct state access is not available
