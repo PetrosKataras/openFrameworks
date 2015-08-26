@@ -22,8 +22,6 @@ ifeq ($(PLATFORM_ARCH),armv7l)
 	LINUX_ARM=1
 endif
 
-USE_EQ=TRUE
-
 #check if gtk exists and add it
 ifeq ($(CROSS_COMPILING),1)
 	HAS_SYSTEM_GTK3 = $(shell export PKG_CONFIG_LIBDIR=$(PKG_CONFIG_LIBDIR);pkg-config gtk+-3.0 --exists; echo $$?)
@@ -76,10 +74,6 @@ endif
 ################################################################################
 
 PLATFORM_DEFINES =
-
-ifeq (${USE_EQ},TRUE)
-    PLATFORM_DEFINES += OF_USING_EQ
-endif
 
 # add OF_USING_GTK define IF we have it defined as a system library
 ifeq ($(HAS_SYSTEM_GTK2),0)

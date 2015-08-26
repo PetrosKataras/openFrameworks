@@ -263,6 +263,7 @@ void ofAppGlutWindow::setup(const ofGLWindowSettings & settings){
 	currentRenderer = shared_ptr<ofBaseRenderer>(new ofGLRenderer(this));
 
 
+#ifndef OF_USING_EQ
 #ifndef TARGET_OPENGLES
 	glewExperimental = GL_TRUE;
 	GLenum err = glewInit();
@@ -272,6 +273,7 @@ void ofAppGlutWindow::setup(const ofGLWindowSettings & settings){
 		ofLogError("ofAppRunner") << "couldn't init GLEW: " << glewGetErrorString(err);
 		return;
 	}
+#endif
 #endif
 	static_cast<ofGLRenderer*>(currentRenderer.get())->setup();
 	setVerticalSync(true);
