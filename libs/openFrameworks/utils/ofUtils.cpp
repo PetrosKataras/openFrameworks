@@ -179,7 +179,7 @@ string ofGetTimestampString(const string& timestampFormat){
 	// so we have to filter out %i (which is not supported by vs)
 	// earlier.
 	auto tmpTimestampFormat = timestampFormat;
-	ofStringReplace(tmpTimestampFormat, "%i", ofToString(ms));
+	ofStringReplace(tmpTimestampFormat, "%i", ofToString(ms, 3, '0'));
 	
 	if (strftime(buf,bufsize, tmpTimestampFormat.c_str(),&tm) != 0){
 		str << buf;
@@ -268,13 +268,19 @@ void ofDisableDataPath(){
 //--------------------------------------------------
 string defaultDataPath(){
 #if defined TARGET_OSX
-	return string("../../../data/");
+    try{
+        return std::filesystem::canonical(ofFilePath::join(ofFilePath::getCurrentExeDir(),  "../../../data/")).string();
+    }catch(...){
+        return ofFilePath::join(ofFilePath::getCurrentExeDir(),  "../../../data/");
+    }
 #elif defined TARGET_ANDROID
 	return string("sdcard/");
-#elif defined(TARGET_LINUX) || defined(TARGET_WIN32)
-	return string(ofFilePath::join(ofFilePath::getCurrentExeDir(),  "data/"));
 #else
-	return string("data/");
+	try{
+	    return std::filesystem::canonical(ofFilePath::join(ofFilePath::getCurrentExeDir(),  "data/")).string();
+	}catch(...){
+	    return ofFilePath::join(ofFilePath::getCurrentExeDir(),  "data/");
+	}
 #endif
 }
 
@@ -290,23 +296,23 @@ static std::filesystem::path & dataPathRoot(){
 	return *dataPathRoot;
 }
 
+namespace of{
+namespace priv{
+    //--------------------------------------------------
+    void setWorkingDirectoryToDefault(){        
+        defaultWorkingDirectory() = std::filesystem::absolute(std::filesystem::current_path());
+    }
+}
+}
+
 //--------------------------------------------------
-void ofSetWorkingDirectoryToDefault(){
-#ifdef TARGET_OSX
-	#ifndef TARGET_OF_IOS
-		char path[MAXPATHLEN];
-		uint32_t size = sizeof(path);
-		
-		if (_NSGetExecutablePath(path, &size) == 0){
-			std::filesystem::path classPath(path);
-			classPath = classPath.parent_path();
-			chdir( classPath.native().c_str() );
-		}else{
-			ofLogFatalError("ofUtils") << "ofSetDataPathRoot(): path buffer too small, need size " << (unsigned int) size;
-		}
-	#endif
-#endif
-	defaultWorkingDirectory() = std::filesystem::absolute(std::filesystem::current_path());
+bool ofRestoreWorkingDirectoryToDefault(){
+    try{
+        std::filesystem::current_path(defaultWorkingDirectory());
+        return true;
+    }catch(...){
+        return false;
+    }
 }
 	
 //--------------------------------------------------
@@ -323,8 +329,8 @@ string ofToDataPath(const string& path, bool makeAbsolute){
 #ifdef TARGET_WIN32
 	if (defaultWorkingDirectory() != std::filesystem::current_path()) {
 		// change our cwd back to where it was on app load
-		int ret = chdir(defaultWorkingDirectory().string().c_str());
-		if(ret==-1){
+		bool ret = ofRestoreWorkingDirectoryToDefault();
+		if(!ret){
 			ofLogWarning("ofUtils") << "ofToDataPath: error while trying to change back to default working directory " << defaultWorkingDirectory();
 		}
 	}
@@ -337,7 +343,12 @@ string ofToDataPath(const string& path, bool makeAbsolute){
 	
 	// if path is already absolute, just return it
 	if (inputPath.is_absolute()) {
-		return path;
+		try {
+			return std::filesystem::canonical(inputPath).string();
+		}
+		catch (...) {
+			return inputPath.string();
+		}
 	}
 	
 	// here we check whether path already refers to the data folder by looking for common elements
@@ -347,19 +358,31 @@ string ofToDataPath(const string& path, bool makeAbsolute){
 	// also, we strip the trailing slash from dataPath since `path` may be input as a file formatted path even if it is a folder (i.e. missing trailing slash)
 	strippedDataPath = ofFilePath::removeTrailingSlash(strippedDataPath);
 	
-	if (inputPath.string().find(strippedDataPath) != 0) {
+	auto relativeStrippedDataPath = ofFilePath::makeRelative(std::filesystem::current_path().string(),dataPath.string());
+	relativeStrippedDataPath  = ofFilePath::removeTrailingSlash(relativeStrippedDataPath);
+
+	if (inputPath.string().find(strippedDataPath) != 0 && inputPath.string().find(relativeStrippedDataPath)!=0) {
 		// inputPath doesn't contain data path already, so we build the output path as the inputPath relative to the dataPath
-		outputPath = dataPath / inputPath;
+	    if(makeAbsolute){
+	        outputPath = dataPath / inputPath;
+	    }else{
+	        outputPath = relativeStrippedDataPath / inputPath;
+	    }
 	} else {
 		// inputPath already contains data path, so no need to change
 		outputPath = inputPath;
 	}
-	
-	// finally, if we do want an absolute path and we don't already have one
-	if (makeAbsolute) {
-		// then we return the absolute form of the path
-		return std::filesystem::absolute(outputPath).string();
-	} else {
+
+    // finally, if we do want an absolute path and we don't already have one
+	if(makeAbsolute){
+	    // then we return the absolute form of the path
+	    try {
+	        return std::filesystem::canonical(std::filesystem::absolute(outputPath)).string();
+	    }
+	    catch (std::exception &) {
+	        return std::filesystem::absolute(outputPath).string();
+	    }
+	}else{
 		// or output the relative path
 		return outputPath.string();
 	}
@@ -507,7 +530,7 @@ template <> string ofToBinary(const string& value) {
 	stringstream out;
 	std::size_t numBytes = value.size();
 	for(std::size_t i = 0; i < numBytes; i++) {
-		bitset<8> bitBuffer(value[i]);
+		std::bitset<8> bitBuffer(value[i]);
 		out << bitBuffer;
 	}
 	return out.str();
@@ -523,21 +546,21 @@ string ofToBinary(const char* value) {
 //----------------------------------------
 int ofBinaryToInt(const string& value) {
 	const int intSize = sizeof(int) * 8;
-	bitset<intSize> binaryString(value);
+	std::bitset<intSize> binaryString(value);
 	return (int) binaryString.to_ulong();
 }
 
 //----------------------------------------
 char ofBinaryToChar(const string& value) {
 	const int charSize = sizeof(char) * 8;
-	bitset<charSize> binaryString(value);
+	std::bitset<charSize> binaryString(value);
 	return (char) binaryString.to_ulong();
 }
 
 //----------------------------------------
 float ofBinaryToFloat(const string& value) {
 	const int floatSize = sizeof(float) * 8;
-	bitset<floatSize> binaryString(value);
+	std::bitset<floatSize> binaryString(value);
 	union ulongFloatUnion {
 			unsigned long result;
 			float f;
@@ -549,7 +572,7 @@ float ofBinaryToFloat(const string& value) {
 string ofBinaryToString(const string& value) {
 	ostringstream out;
 	stringstream stream(value);
-	bitset<8> byteString;
+	std::bitset<8> byteString;
 	std::size_t numBytes = value.size() / 8;
 	for(std::size_t i = 0; i < numBytes; i++) {
 		stream >> byteString;
@@ -716,27 +739,23 @@ string ofToUpper(const string & src, const string & locale){
 
 //--------------------------------------------------
 string ofTrimFront(const string & src, const string& locale){
-	std::locale loc = getLocale(locale);
-	auto it = ofUTF8Iterator(src);
-	auto front = std::find_if_not(it.begin(),it.end(),[&loc](uint32_t c){return std::isspace<wchar_t>(c,loc);});
-	return std::string(front,it.end());
+    auto dst = src;
+    std::locale loc = getLocale(locale);
+    dst.erase(dst.begin(),std::find_if_not(dst.begin(),dst.end(),[&](char & c){return std::isspace<char>(c,loc);}));
+    return dst;
 }
 
 //--------------------------------------------------
 string ofTrimBack(const string & src, const string& locale){
-	std::locale loc = getLocale(locale);
-	auto it = ofUTF8Iterator(src);
-	auto back = std::find_if_not(it.rbegin(),it.rend(),[&loc](uint32_t c){return std::isspace<wchar_t>(c,loc);}).base().base();
-	return std::string(it.begin().base(),back);
+    auto dst = src;
+    std::locale loc = getLocale(locale);
+	dst.erase(std::find_if_not(dst.rbegin(),dst.rend(),[&](char & c){return std::isspace<char>(c,loc);}).base(), dst.end());
+	return dst;
 }
 
 //--------------------------------------------------
 string ofTrim(const string & src, const string& locale){
-	std::locale loc = getLocale(locale);
-	auto it = ofUTF8Iterator(src);
-	auto front = std::find_if_not(it.begin(),it.end(),[&loc](uint32_t c){return std::isspace<wchar_t>(c,loc);}).base();
-	auto back = std::find_if_not(it.rbegin(), it.rend(),[&loc](uint32_t c){return std::isspace<wchar_t>(c,loc);}).base().base();
-	return (back<=front ? std::string() : std::string(front,back));
+    return ofTrimFront(ofTrimBack(src));
 }
 
 //--------------------------------------------------
@@ -823,14 +842,8 @@ void ofLaunchBrowser(const string& url, bool uriEncodeQuery){
 	}
 
 	#ifdef TARGET_WIN32
-		#if (_MSC_VER)
-		// microsoft visual studio yaks about strings, wide chars, unicode, etc
 		ShellExecuteA(nullptr, "open", uri.toString().c_str(),
                 nullptr, nullptr, SW_SHOWNORMAL);
-		#else
-		ShellExecute(nullptr, "open", uri.toString().c_str(),
-                nullptr, nullptr, SW_SHOWNORMAL);
-		#endif
 	#endif
 
 	#ifdef TARGET_OSX
