@@ -687,18 +687,18 @@ void ofFile::setExecutable(bool flag){
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofFile::copyTo(const string& _path, bool bRelativeToData, bool overwrite){
+bool ofFile::copyTo(const string& _path, bool bRelativeToData, bool overwrite) const{
 	std::string path = _path;
 
 	if(isDirectory()){
 		return ofDirectory(myFile).copyTo(path,bRelativeToData,overwrite);
 	}
 	if(path.empty()){
-		ofLogError("ofFile") << "copyTo(): destination path is empty";
+		ofLogError("ofFile") << "copyTo(): destination path " << _path << " is empty";
 		return false;
 	}
 	if(!exists()){
-		ofLogError("ofFile") << "copyTo(): source file does not exist";
+		ofLogError("ofFile") << "copyTo(): source file " << this->path() << " does not exist";
 		return false;
 	}
 
@@ -722,7 +722,7 @@ bool ofFile::copyTo(const string& _path, bool bRelativeToData, bool overwrite){
 		if(!ofDirectory(ofFilePath::getEnclosingDirectory(path,bRelativeToData)).exists()){
 			ofFilePath::createEnclosingDirectory(path, bRelativeToData);
 		}
-		std::filesystem::copy(myFile,path);
+		std::filesystem::copy_file(myFile,path);
 	}catch(std::exception & except){
 		ofLogError("ofFile") <<  "copyTo(): unable to copy \"" << path << "\":" << except.what();
 		return false;
@@ -940,7 +940,11 @@ string ofDirectory::path() const {
 
 //------------------------------------------------------------------------------------------------------------
 string ofDirectory::getAbsolutePath() const {
-	return std::filesystem::absolute(myDir).string();
+	try{
+		return std::filesystem::canonical(std::filesystem::absolute(myDir)).string();
+	}catch(...){
+		return std::filesystem::absolute(myDir).string();
+	}
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -1161,7 +1165,7 @@ ofFile ofDirectory::operator[](std::size_t position) const {
 
 //------------------------------------------------------------------------------------------------------------
 const vector<ofFile> & ofDirectory::getFiles() const{
-	if(files.empty()){
+	if(files.empty() && !myDir.empty()){
 		const_cast<ofDirectory*>(this)->listDir();
 	}
 	return files;
@@ -1190,7 +1194,18 @@ static bool natural(const ofFile& a, const ofFile& b) {
 
 //------------------------------------------------------------------------------------------------------------
 void ofDirectory::sort(){
+    if(files.empty() && !myDir.empty()){
+        listDir();
+    }
 	ofSort(files, natural);
+}
+
+//------------------------------------------------------------------------------------------------------------
+ofDirectory ofDirectory::getSorted(){
+    ofDirectory sorted(*this);
+    sorted.listDir();
+    sorted.sort();
+    return sorted;
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -1219,31 +1234,45 @@ bool ofDirectory::removeDirectory(const std::string& _path, bool deleteIfNotEmpt
 
 //------------------------------------------------------------------------------------------------------------
 bool ofDirectory::createDirectory(const std::string& _dirPath, bool bRelativeToData, bool recursive){
+	
 	std::string dirPath = _dirPath;
 
 	if(bRelativeToData){
 		dirPath = ofToDataPath(dirPath);
 	}
-
-	bool success = false;
-	try{
-		if(!recursive){
-			success = std::filesystem::create_directory(dirPath);
-		}else{
-			success = std::filesystem::create_directories(dirPath);
+	
+	
+	// on OSX,std::filesystem::create_directories seems to return false *if* the path has folders that already exist
+	// and true if it doesn't
+	// so to avoid unnecessary warnings on OSX, we check if it exists here:
+	
+	bool bDoesExistAlready = ofDirectory::doesDirectoryExist(dirPath);
+	
+	if (!bDoesExistAlready){
+		
+		bool success = false;
+		try{
+			if(!recursive){
+				success = std::filesystem::create_directory(dirPath);
+			}else{
+				success = std::filesystem::create_directories(dirPath);
+			}
+		} catch(std::exception & except){
+			ofLogError("ofDirectory") << "createDirectory(): couldn't create directory \"" << dirPath << "\": " << except.what();
+			return false;
 		}
-	}
-	catch(std::exception & except){
-		ofLogError("ofDirectory") << "createDirectory(): couldn't create directory \"" << dirPath << "\": " << except.what();
-		return false;
-	}
-
-	if(!success){
+		return success;
+		
+	} else {
+			
 		ofLogWarning("ofDirectory") << "createDirectory(): directory already exists: \"" << dirPath << "\"";
-		success = true;
+		return true;
+	
 	}
 
-	return success;
+
+
+	
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -1252,7 +1281,7 @@ bool ofDirectory::doesDirectoryExist(const std::string& _dirPath, bool bRelative
 	if(bRelativeToData){
 		dirPath = ofToDataPath(dirPath);
 	}
-	return std::filesystem::exists(dirPath);
+	return std::filesystem::exists(dirPath) && std::filesystem::is_directory(dirPath);
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -1269,32 +1298,32 @@ bool ofDirectory::isDirectoryEmpty(const std::string& _dirPath, bool bRelativeTo
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator==(const ofDirectory & dir){
+bool ofDirectory::operator==(const ofDirectory & dir) const{
 	return getAbsolutePath() == dir.getAbsolutePath();
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator!=(const ofDirectory & dir){
+bool ofDirectory::operator!=(const ofDirectory & dir) const{
 	return getAbsolutePath() != dir.getAbsolutePath();
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator<(const ofDirectory & dir){
+bool ofDirectory::operator<(const ofDirectory & dir) const{
 	return getAbsolutePath() < dir.getAbsolutePath();
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator<=(const ofDirectory & dir){
+bool ofDirectory::operator<=(const ofDirectory & dir) const{
 	return getAbsolutePath() <= dir.getAbsolutePath();
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator>(const ofDirectory & dir){
+bool ofDirectory::operator>(const ofDirectory & dir) const{
 	return getAbsolutePath() > dir.getAbsolutePath();
 }
 
 //------------------------------------------------------------------------------------------------------------
-bool ofDirectory::operator>=(const ofDirectory & dir){
+bool ofDirectory::operator>=(const ofDirectory & dir) const{
 	return getAbsolutePath() >= dir.getAbsolutePath();
 }
 
@@ -1417,15 +1446,15 @@ bool ofFilePath::createEnclosingDirectory(const std::string& filePath, bool bRel
 }
 
 //------------------------------------------------------------------------------------------------------------
-string ofFilePath::getAbsolutePath(const std::string& _path, bool bRelativeToData){
-	std::string path = _path;
+string ofFilePath::getAbsolutePath(const std::string& path, bool bRelativeToData){
 	if(bRelativeToData){
-		path = ofToDataPath(path);
-	}
-	try{
-		return std::filesystem::canonical(path).string();
-	}catch(...){
-		return path;
+		return ofToDataPath(path, true);
+	}else{
+		try{
+			return std::filesystem::canonical(std::filesystem::absolute(path)).string();
+		}catch(...){
+			return std::filesystem::absolute(path).string();
+		}
 	}
 }
 
@@ -1437,20 +1466,7 @@ bool ofFilePath::isAbsolute(const std::string& path){
 
 //------------------------------------------------------------------------------------------------------------
 string ofFilePath::getCurrentWorkingDirectory(){
-	#ifdef TARGET_OSX
-		char pathOSX[FILENAME_MAX];
-		uint32_t size = sizeof(pathOSX);
-		if(_NSGetExecutablePath(pathOSX, &size) != 0){
-			ofLogError("ofFilePath") << "getCurrentWorkingDirectory(): path buffer too small, need size " <<  size;
-		}
-		string pathOSXStr = string(pathOSX);
-		string pathWithoutApp;
-		size_t found = pathOSXStr.find_last_of("/");
-		pathWithoutApp = pathOSXStr.substr(0, found);
-		return pathWithoutApp;
-	#else
-		return std::filesystem::current_path().string();
-	#endif
+	return std::filesystem::current_path().string();
 }
 
 //------------------------------------------------------------------------------------------------------------
@@ -1507,4 +1523,24 @@ string ofFilePath::getUserHomeDir(){
 	#else
 		return "";
 	#endif
+}
+
+string ofFilePath::makeRelative(const std::string & from, const std::string & to){
+    auto pathFrom = std::filesystem::absolute( from );
+    auto pathTo = std::filesystem::absolute( to );
+    std::filesystem::path ret;
+    std::filesystem::path::const_iterator itrFrom( pathFrom.begin() ), itrTo( pathTo.begin() );
+    // Find common base
+    for( std::filesystem::path::const_iterator toEnd( pathTo.end() ), fromEnd( pathFrom.end() ) ; itrFrom != fromEnd && itrTo != toEnd && *itrFrom == *itrTo; ++itrFrom, ++itrTo );
+    // Navigate backwards in directory to reach previously found base
+    for( std::filesystem::path::const_iterator fromEnd( pathFrom.end() ); itrFrom != fromEnd; ++itrFrom )
+    {
+        if( (*itrFrom) != "." )
+            ret /= "..";
+    }
+    // Now navigate down the directory branch
+    for( ; itrTo != pathTo.end() ; ++itrTo )
+        ret /= *itrTo;
+
+    return ret.string();
 }
