@@ -1,5 +1,10 @@
 #!/bin/bash
 
+lastversion=$(date +%Y%m%d)
+echo "Building nightly builds $lastversion"
+
+. $HOME/.profile
+
 set -o pipefail  # trace ERR through pipes
 set -o errtrace  # trace ERR through 'time command' and other functions
 set -o nounset   # set -u : exit the script if you try to use an uninitialized variable
@@ -15,25 +20,32 @@ error() {
     local code="${2:-1}"
     echo "Error on or near line ${parent_lineno}; exiting with status ${code}"
   fi
+  rm -f *.tar.gz
+  rm -f *.zip
   exit "${code}"
 }
 trap 'error ${LINENO}' ERR
 
+touch lasthash.txt
+export PG_OF_PATH=$(cat ~/.ofprojectgenerator/config)
 cd $(cat ~/.ofprojectgenerator/config)
 git fetch upstreamhttps
 git reset --hard upstreamhttps/master
+scripts/dev/download_libs.sh
+
 cd $(cat ~/.ofprojectgenerator/config)/scripts/dev
 lasthash=$(cat lasthash.txt)
 currenthash=$(git rev-parse HEAD)
 if [ "$currenthash" = "$lasthash" ]; then
+    echo "Exiting, no changes found"
     exit 0
 fi
 
-lastversion=$(date +%Y%m%d)
 echo $currenthash>lasthash.txt
-./create_package.sh linux $lastversion master
 ./create_package.sh linux64 $lastversion master
-./create_package.sh win_cb $lastversion master
+./create_package.sh linux64 $lastversion master gcc5
+./create_package.sh linux64 $lastversion master gcc6
+./create_package.sh msys2 $lastversion master
 ./create_package.sh vs $lastversion master
 ./create_package.sh ios $lastversion master
 ./create_package.sh osx $lastversion master
@@ -47,9 +59,10 @@ rm -f /var/www/versions/nightly/of_v*_nightly.*
 mv *.tar.gz /var/www/versions/nightly
 mv *.zip /var/www/versions/nightly
 
-mv /var/www/versions/nightly/of_v${lastversion}_linux_release.tar.gz /var/www/versions/nightly/of_v${lastversion}_linux_nightly.tar.gz
 mv /var/www/versions/nightly/of_v${lastversion}_linux64_release.tar.gz /var/www/versions/nightly/of_v${lastversion}_linux64_nightly.tar.gz
-mv /var/www/versions/nightly/of_v${lastversion}_win_cb_release.zip /var/www/versions/nightly/of_v${lastversion}_win_cb_nightly.zip
+mv /var/www/versions/nightly/of_v${lastversion}_linux64gcc5_release.tar.gz /var/www/versions/nightly/of_v${lastversion}_linux64gcc5_nightly.tar.gz
+mv /var/www/versions/nightly/of_v${lastversion}_linux64gcc6_release.tar.gz /var/www/versions/nightly/of_v${lastversion}_linux64gcc6_nightly.tar.gz
+mv /var/www/versions/nightly/of_v${lastversion}_msys2_release.zip /var/www/versions/nightly/of_v${lastversion}_msys2_nightly.zip
 mv /var/www/versions/nightly/of_v${lastversion}_vs_release.zip /var/www/versions/nightly/of_v${lastversion}_vs_nightly.zip
 mv /var/www/versions/nightly/of_v${lastversion}_ios_release.zip /var/www/versions/nightly/of_v${lastversion}_ios_nightly.zip
 mv /var/www/versions/nightly/of_v${lastversion}_osx_release.zip /var/www/versions/nightly/of_v${lastversion}_osx_nightly.zip
@@ -79,3 +92,8 @@ echo '</body>' >> /var/www/nightlybuilds.html
 echo '</html>' >> /var/www/nightlybuilds.html
 
 #wget http://openframeworks.cc/nightly_hook.php?version=${lastversion} -O /dev/null
+
+echo 
+echo
+echo "Successfully created nightly builds for ${lastversion}"
+echo
